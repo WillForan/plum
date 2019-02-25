@@ -1,6 +1,9 @@
 #!/usr/bin/env perl
 use strict; use warnings;
 use v5.28;
+use feature qw(signatures);
+no warnings qw(experimental::signatures experimental::smartmatch);
+our $DEBUG=3;
 
 #
 # Parse psuedo-plumb(7) (plan9port) plumber files
@@ -37,31 +40,58 @@ use v5.28;
 #  * start     -- launch program (from cwd of X11 app)
 
 
-sub try_next(%textInfo) {
-   @matches = (); # reg exp matches
-   $cmd = "";
-   while(<>) {
+sub try_next($textInfo) {
+   my @matches = (); # reg exp matches
+   my $cmd = "xx";
+   while($_=<main::DATA>) {
+      print $_ if $DEBUG>2;
+      s/ #.*//;
+      
       given($_) {
-      when(m/^from (\s+)/) {$text=`xclip -o $1`;}
-      when(m/^(text|cwd|app|) matches (.*)/) {
-         @matches = ($textInfo{$1} m/\Q$2/);
-         # if no matches, we dont do anything
-         say "no matches for $_"  if $DEBUG;
-         return if $#matches < 0;
-      }
-      when(m/^add (.*)/){
-         while( m/(\s+)=\$([0-9]+)/g) {
-            $textInfo{$1} = $matches[$2-1];
+         when(/^\s*#/) {
+            say "skipping comment $_" if $DEBUG;
+            next;
+         }
+         when(m/^from (\w+)/) {
+            $textInfo->{'text'}=`xclip -o $1`;
+         }
+         when(m/^(text|cwd|app|) matches (.*)/) {
+            say "matching $2 against $1: $textInfo->{$1}"  if $DEBUG;
+            my $re = qr/$2/;
+            @matches = ($textInfo->{$1} =~ /$re/);
+            # if no matches, we dont do anything
+            say "no matches for $_"  if $DEBUG;
+            return($cmd) if $#matches < 0;
+         }
+         when(m/^add (.*)/){
+            while( m/(\w+)=\$(\d+)/g) {
+               $textInfo->{$1} = $matches[$2-1];
             say "added $1 = ", $matches[$2-1] if $DEBUG;
          }
       }
+      # replace command with anything we've stored
       when(m/^start (.*)/){
-         while( m/(\s+)=\$([0-9]+)/g) {
-            $added{$1} = $matches[$2-1];
-            say "added $1 = ", $matches[$2-1] if $DEBUG;
-         }
+         $cmd="$1";
+         $cmd =~ s/\$(\w+)/$textInfo->{$1}/ge
       }
       default {return($cmd)}
       }
    }
-}
+   return $cmd;
+};
+
+my $cmd=try_next({'text'=>"https://google.com"});
+say $cmd;
+
+__END__
+# open http or https in a browser
+text matches ^https?://
+start xdg-open $text
+
+# use ctrl+c clipboard to convert images when in inkscape
+from secondary
+text matches ^(\s+).(jpe?g|gif|ppm)$
+add base=$1 ext=$2
+app matches inkscape
+start convert $text $base.png
+
