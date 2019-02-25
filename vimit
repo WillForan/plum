@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+#
+# find if any vim process already have a file open
+# - if not, open a new term + bash + vim window
+# - if yes, focus window
+#    - if netbeans, send optional line and search
+
+if [ "$1" == "-t" ];then interm=1;shift; else interm=0; fi
+file="$1"; shift
+lineno="$1"; shift
+search="$1"; shift
+
+launch_new(){ 
+   echo "launching new vim"
+   vimcmd="vim '$file' "
+   [ -n "$lineno" ] && vimcmd="$vimcmd +$lineno"
+   [ -n "$search" ] && vimcmd="$vimcmd '+/$search'"
+   # launch in terminal or with urxvt inside bash
+   [ $interm -eq 1 ] && eval "$vimcmd" || urxvt -e bash -c "$vimcmd"
+}
+
+[ -z "$file" ] && echo "need file" >&2 && exit 1
+[ -r "$file" ] && file="$(readlink -f $file)"
+#[[ ! "$file" =~ ^/ ]] && echo "cannot work with relative filename '$file'" && exit 1
+[[ ! "$file" =~ ^/ ]] && file=$(pwd)/$file
+
+# swap might have % intead of /
+swapname1="$(echo "$file" |sed s:/:%:g)" #e.g. $HOME/.cache/vim/swap/%home%...
+pid=$(lsof -c vim | egrep "$swapname1$"|tail -n1|awk '{print $2}')
+if [ -n "$pid" ]; then
+   # find pid of all parents (that aren't 1-9), find the last in the tree with a window id
+   wid=$(pstree -sp 24783| perl -lne 'print $& while m/\d{2,}/g;'|xargs -n1 xdotool search --pid|tail -n1) 
+   [ -z "$wid" ] && echo "no window for vim $pid! open over ssh?" >&2 && exit 1
+   xdotool windowactivate $wid
+
+   # do we have netbeans?
+   ps -p $pid -o command|sed 1d | grep '\-nb'
+else
+  launch_new
+fi

@@ -3,10 +3,14 @@ use strict; use warnings;
 use v5.28;
 use feature qw(signatures);
 no warnings qw(experimental::signatures experimental::smartmatch);
-our $DEBUG=3;
+
+# quick print of whats going on
+our $DEBUG=0;
+sub debug($msg, $level) { say "DEBUG($level): $msg" if $DEBUG >= $level; }
 
 #
 # Parse psuedo-plumb(7) (plan9port) plumber files
+# requires ps, xdotool, xclip
 #
 
 # e.g.
@@ -40,52 +44,156 @@ our $DEBUG=3;
 #  * start     -- launch program (from cwd of X11 app)
 
 
-sub try_next($textInfo) {
+# find what it is we are told to (file or folder)
+# are there other objects? should we abstract this more?
+# TODO: how do we call '-f' as a variable? 
+sub isfile($search, $textInfo) {
+   return($search) if( -e -r -f $search);
+   # try glob
+   my @g = glob($search);
+   return($g[0]) if($#g == 0 && -e -r -f $g[0]);
+   # nothing matches
+   return("");
+}
+sub isdir($search, $textInfo) {
+   return($search) if( -e -r -d $search);
+   # try glob
+   my @g = glob($search);
+   return($g[0]) if($#g == 0 && -e -r -d $g[0]);
+   # nothing matches
+   return("");
+}
+# functions get called by looking up from matched string
+our %loc = ( 'file' => \&isfile, 'dir' => \&isdir);
+
+
+sub cmd_from_section($INFH, $textInfo) {
    my @matches = (); # reg exp matches
-   my $cmd = "xx";
-   while($_=<main::DATA>) {
-      print $_ if $DEBUG>2;
+   my $cmd = "";
+   while($_=<$INFH>) {
+      chomp;
+      debug("section readline: $_",3);
       s/ #.*//;
       
       given($_) {
          when(/^\s*#/) {
-            say "skipping comment $_" if $DEBUG;
+            debug("skipping comment $_", 1);
             next;
          }
          when(m/^from (\w+)/) {
             $textInfo->{'text'}=`xclip -o $1`;
          }
          when(m/^(text|cwd|app|) matches (.*)/) {
-            say "matching $2 against $1: $textInfo->{$1}"  if $DEBUG;
+            debug("matching $2 against $1: $textInfo->{$1}", 1);
             my $re = qr/$2/;
             @matches = ($textInfo->{$1} =~ /$re/);
             # if no matches, we dont do anything
-            say "no matches for $_"  if $DEBUG;
-            return($cmd) if $#matches < 0;
+            debug("no matches '$_'", 1) if $#matches < 0;
+            last if $#matches < 0;
          }
          when(m/^add (.*)/){
             while( m/(\w+)=\$(\d+)/g) {
                $textInfo->{$1} = $matches[$2-1];
-            say "added $1 = ", $matches[$2-1] if $DEBUG;
+               debug("added $1 = ". $matches[$2-1],1);
+            }
+         }
+         # add file or dir to the textInfo hash or rule doesn't match
+         when(m/^arg is(file|dir) (.*)/){
+            my $f_or_d=$1;
+            my $totest=$2;
+            $totest =~ s/\$(\w+)/$textInfo->{$1}/ge;
+            $textInfo->{$f_or_d} = $loc{$f_or_d}->($totest, $textInfo);
+            # if lookup failed, get out of here
+            last if ! $textInfo->{$f_or_d};
+            debug("added $1 = ". $matches[$2-1], 1);
+         }
+         # replace command with anything we've stored
+         when(m/^start (.*)/){
+            $cmd="$1";
+            $cmd =~ s/\$(\w+)/$textInfo->{$1}/ge;
+         }
+         when(m/^$/){
+            last;
+         }
+         default {
+            debug("section: line not understood: $_",0);
+            last
          }
       }
-      # replace command with anything we've stored
-      when(m/^start (.*)/){
-         $cmd="$1";
-         $cmd =~ s/\$(\w+)/$textInfo->{$1}/ge
-      }
-      default {return($cmd)}
+  }
+     
+  # read up to the next section
+  until(/^$/){ $_=<$INFH>; }
+  #until(/^$/ or eof($INFH)){ $_=<$INFH>; } 
+  # inline::files eof() not supported
+  return $cmd;
+}
+
+# get title, app, and clipboard text
+sub setup_info() {
+   my $textInfo = {};
+   # xdotool to get pid
+   chomp(my $wpid=`xdotool getwindowfocus getwindowpid`);
+   debug("wpid: $wpid",1);
+
+   # grab last entry from ps, take only the first word
+   chomp(my $psapp = (split(/\n/, `ps -o comm,args -p $wpid`))[-1]);
+	$textInfo->{app}=(split(/\s+/, $psapp))[0];
+   debug("app: $textInfo->{app}",1);
+
+   # use xdotool to get window
+   chomp($textInfo->{title} = `xdotool getactivewindow getwindowname`);
+   debug("title: $textInfo->{title}",1);
+
+   # fetch clipboard
+   # TODO: use perl lib for cross platform? will require cpanm install
+   $textInfo->{text} = `xclip -o`;
+   debug("text: $textInfo->{text}",1);
+   return($textInfo);
+}
+
+# TODO: config file provides regexp for getting cwd
+sub cwd_rules($INFH){
+   while($_=<$INFH>){
+      debug("cwd_rules readline: $_",3);
+      if( m/parse cwd (\S+) (\S+) (\S+)/){
+         debug('parse cwd not implemented yet!', 0);
+         next;
       }
    }
-   return $cmd;
-};
+}
+#
+# 
+sub read_config($INFH, $textInfo){
+   my $cmd = "";
+   while(!eof($INFH)){
+      # define ways to parse cwd given program regexp, title regexp, reconstruction
+      $cmd=cmd_from_section($INFH, $textInfo);
+      # read read of lines from failed command parse
+      return($cmd) if $cmd;
+   };
+   # empty string if no command found
+   return("")
+}
 
-my $cmd=try_next({'text'=>"https://google.com"});
-say $cmd;
+# protect execution from test code
+# -- only run if e.g. ./plum
+unless(caller){
+   my $textInfo = setup_info();
+   #my $textInfo = {};
+   $textInfo->{text}="https://google.com"; # for url
+   my $cmd=read_config(*DATA, $textInfo);
+   say $cmd;
+}
 
-__END__
+__DATA__
 # open http or https in a browser
-text matches ^https?://
+text matches ^https?://.*
+text matches hangouts
+start chromium $text
+
+
+text matches ^https?://.*
 start xdg-open $text
 
 # use ctrl+c clipboard to convert images when in inkscape
