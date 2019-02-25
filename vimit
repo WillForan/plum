@@ -1,12 +1,35 @@
 #!/usr/bin/env bash
+#set -x
 
 #
 # find if any vim process already have a file open
-# - if not, open a new term + bash + vim window
+# - if not, open a new urxvt + bash + vim window
+#    - TODO: ctrl-z vim drops into bash 
 # - if yes, focus window
-#    - if netbeans, send optional line and search
+#    - if process is suspended and we are focused on the window containing it, fg the process 
+#    - TODO: if -netbeans socket aviable, send buffer focus, optional line and search
+
+#
+# vim buffers are identified by their swap file
+# on my system `lsof -c vim| grep /swap/`
+# is
+# /home/foranw/.cache/vim/swap/%home%foranw%src%utils%plum%vimit.swp
+# for the file  home/foranw/src/utils/plum/vimit
+#
+
+# NB. to protect against forgrounding vim when we shoulding
+# make sure to put space in your xwindow term title for running program
+# but not when shell is interactive
 
 if [ "$1" == "-t" ];then interm=1;shift; else interm=0; fi
+
+if [ "$1" == "-rofi" ]; then
+   lsof -c vim|
+   perl -salne '$_=$F[8];next unless s:/.*/swap/%:/:;s:%:/:g; s/.\w{3}$//; print' |
+   rofi -dmenu | xargs -r -n1 $0
+   exit
+fi
+
 file="$1"; shift
 lineno="$1"; shift
 search="$1"; shift
@@ -17,7 +40,7 @@ launch_new(){
    [ -n "$lineno" ] && vimcmd="$vimcmd +$lineno"
    [ -n "$search" ] && vimcmd="$vimcmd '+/$search'"
    # launch in terminal or with urxvt inside bash
-   [ $interm -eq 1 ] && eval "$vimcmd" || urxvt -e bash -c "$vimcmd"
+   [ $interm -eq 1 ] && eval "$vimcmd" || urxvt -e bash -c "$vimcmd" &
 }
 
 [ -z "$file" ] && echo "need file" >&2 && exit 1
@@ -27,12 +50,29 @@ launch_new(){
 
 # swap might have % intead of /
 swapname1="$(echo "$file" |sed s:/:%:g)" #e.g. $HOME/.cache/vim/swap/%home%...
-pid=$(lsof -c vim | egrep "$swapname1$"|tail -n1|awk '{print $2}')
+pid=$(lsof -c vim | egrep "$swapname1.[a-z][a-z][a-z]$"|tail -n1|awk '{print $2}')
 if [ -n "$pid" ]; then
    # find pid of all parents (that aren't 1-9), find the last in the tree with a window id
-   wid=$(pstree -sp 24783| perl -lne 'print $& while m/\d{2,}/g;'|xargs -n1 xdotool search --pid|tail -n1) 
+   wid=$(pstree -sp $pid|
+         perl -lne 'print $& while m/\d{2,}/g;'|
+         xargs -r -n1 xdotool search --pid |
+         tail -n1) 
    [ -z "$wid" ] && echo "no window for vim $pid! open over ssh?" >&2 && exit 1
-   xdotool windowactivate $wid
+
+   cwid=$(xdotool search --pid $(xdotool getwindowfocus getwindowpid))
+   if [ $cwid = $wid ]; then
+      # this is sketchy 
+      # if we are in the same window and the process is suspended, try to forgroude it
+      # by typing. no garentee that the shell is whats in the forground. might type over something important
+      # the catch against this is that the window name not have spaces -- set by shell only when not forground
+      vimstatus="$(ps -p $pid -os|sed 1d)"
+      winname="$(xdotool getactivewindow getwindowname)"
+      [[ "$vimstatus" =~ T ]] && [[ "$winname" =~ " " ]] &&
+         xdotool key ctrl+u type "fg vim"
+        #kill -SIGCONT $pid # doesn't work -- cant grab tty
+   else
+      xdotool windowactivate $wid
+   fi
 
    # do we have netbeans?
    ps -p $pid -o command|sed 1d | grep '\-nb'

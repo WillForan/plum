@@ -180,10 +180,25 @@ sub read_config($INFH, $textInfo){
 # -- only run if e.g. ./plum
 unless(caller){
    my $textInfo = setup_info();
-   #my $textInfo = {};
-   $textInfo->{text}="https://google.com"; # for url
-   my $cmd=read_config(*DATA, $textInfo);
-   say $cmd;
+   my $fh;
+   foreach my $f ("$ENV{HOME}/.config/plum.conf","/etc/plum.conf", "./plum.conf") {
+     debug("testing $f",3);
+     next unless -e $f;
+     open($fh, '<', $f) or die "cannot open $f";
+     debug("using $f",1);
+   }
+   if(not $fh){
+     $fh=*DATA if not $fh;
+     debug("using built in plumbing",1);
+   }
+   my $cmd=read_config($fh, $textInfo);
+   if($cmd eq ""){
+      debug("no matching commands for '$textInfo->{text}'",1);
+      exit(1);
+   }
+
+   debug("exec $cmd",3);
+   exec $cmd;
 }
 
 __DATA__
