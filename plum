@@ -1,0 +1,67 @@
+#!/usr/bin/env perl
+use strict; use warnings;
+use v5.28;
+
+#
+# Parse psuedo-plumb(7) (plan9port) plumber files
+#
+
+# e.g.
+#
+#  # open http or https in a browser
+#  text matches ^https?://
+#  start xdg-open $text
+#
+#  # use ctrl+c clipboard to convert images when in inkscape
+#  from secondary
+#  text matches ^(\s+).(jpe?g|gif|ppm)$
+#  add base=$1 ext=$2
+#  app matches inkscape
+#  start convert $text $base.png
+
+####
+# format: paragraphs (2x\n delimited) with
+#
+#  {text,cwd,app,title} matches REGEXP
+#  add myvar=$1
+#  plum PROGRAM $cwd $myvar 
+
+# where
+# * 'text' is the text on the clipboard
+# * 'cwd' is current working directory
+# * 'app' is the application focused
+# and keywords 
+#  * from      -- which clipboard
+#  * matches   -- regexp
+#  * add       -- create variable
+#  * start     -- launch program (from cwd of X11 app)
+
+
+sub try_next(%textInfo) {
+   @matches = (); # reg exp matches
+   $cmd = "";
+   while(<>) {
+      given($_) {
+      when(m/^from (\s+)/) {$text=`xclip -o $1`;}
+      when(m/^(text|cwd|app|) matches (.*)/) {
+         @matches = ($textInfo{$1} m/\Q$2/);
+         # if no matches, we dont do anything
+         say "no matches for $_"  if $DEBUG;
+         return if $#matches < 0;
+      }
+      when(m/^add (.*)/){
+         while( m/(\s+)=\$([0-9]+)/g) {
+            $textInfo{$1} = $matches[$2-1];
+            say "added $1 = ", $matches[$2-1] if $DEBUG;
+         }
+      }
+      when(m/^start (.*)/){
+         while( m/(\s+)=\$([0-9]+)/g) {
+            $added{$1} = $matches[$2-1];
+            say "added $1 = ", $matches[$2-1] if $DEBUG;
+         }
+      }
+      default {return($cmd)}
+      }
+   }
+}
