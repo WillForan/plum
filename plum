@@ -7,6 +7,7 @@ no warnings qw(experimental::signatures experimental::smartmatch);
 
 # quick print of whats going on
 our $DEBUG=0;
+$DEBUG=$ENV{PLUM_DEBUG} if $ENV{PLUM_DEBUG};
 sub debug($msg, $level) { say "DEBUG($level): $msg" if $DEBUG >= $level; }
 
 #
@@ -91,7 +92,16 @@ sub cmd_from_section($INFH, $textInfo) {
             next;
          }
          when(m/^from (\w+)/) {
-            $textInfo->{'text'}=`xclip -o -selection $1`;
+            my $from=$1;
+            given($from){
+               # get from clipboard
+               $textInfo->{'text'}=`xclip -o -selection $from` when(/clip|secondary|primary/i);
+               # or arguments
+               $textInfo->{'text'}=join(" ", @ARGV) when(/ARGV/i);
+               # or what was piped in -- this one is probalby a bad idea
+               $textInfo->{'text'}=join("\n",<>) when(/^STDIN|-$/i);
+               default {$textInfo->{'text'}="";}
+            }
          }
          when(m/^(text|cwd|app) matches (.*)/) {
             debug("matching $2 against $1: $textInfo->{$1}", 1);
@@ -274,6 +284,10 @@ __DATA__
 parse cwd urxvt|term \w+@\S+?:\s?([~/]\S*?)"?(\s|$) $1
 
 ## what to run with what matches
+# open web links
+text matches (https?://[^\s()]+)
+start xdg-open "$1"
+
 # file.pl line 20, near "blah blah"
 text matches (\S+) line (\d+), near "(.*)"
 add file=$1 line=$2 search=$3
@@ -292,3 +306,10 @@ text matches ^notify$
 from clipboard
 start xmessage "$text"
 
+# show what's selected based on arguments
+# maybe use like it were an acme title window
+# echo '^ca(1,plum notify)notify^ca()' | dzen2 -p 
+from argv
+text matches ^notify$
+from primary
+start xmessage "$title: $text"

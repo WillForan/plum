@@ -1,19 +1,32 @@
 # Plum
-A context aware regular expression based command runner.
+Do something with selected text using a context aware regular expression based command runner.
 
 `plum` is an adulterate plan9 [`plumber(4)`](https://9fans.github.io/plan9port/man/man4/plumber.html) for X11, with other apologies to [godothecorrectthing](https://github.com/andrewchambers/godothecorrectthing).
 
+It works by matching and extracting against the clipboard (default to primary) text, current window title, focused application name, stdin, and/or input arguments.
+You can add more fields.
+
 Configuration is similar to but not compatible with [`plumb(7)`](https://9fans.github.io/plan9port/man/man7/plumb.html).
 
+## Example use and configureation
 
-Run comands based on regular expressions rules matching and extracting clipboard text, current window title, and application name.
+A simple rule it looks like
+```
+# extract the first web url and open it
+text matches (https?://[^\s()]+)
+start xdg-open "$1"
+```
 
+A more useful rule
+```
+# open file at line from error message 'file.pl line 20'
+text matches (\S+) line (\d+)
+add file=$1 line=$2 
+# isfile makes use of cwd and expands globs to try to find a file
+arg isfile $file
+start vimit "$file" +$line
+```
 
-## Example Usage
-* mouse select a url anywhere, hit the magic key, and the url opens in firefox
-* select any text, magic key when firefox is focused searches text
-* select `error at ./plum line 168, near "my cmd ="`, hit the magic key, and open an editor on `./plum` with `my cmd` highlighted.
-* pipe the contents of clipboard to the highlighted command a la `acme`
 
 
 ## Setup
@@ -25,16 +38,21 @@ Run comands based on regular expressions rules matching and extracting clipboard
 
 ### example launchers
 
-`~/.xbindkeys`
+#### `~/.xbindkeys`
 ```
 "plum"
     Mod4 + g
 
 ```
 
-`~/.config/libinput-gestures.conf`
+#### `~/.config/libinput-gestures.conf`
 ```
 gesture: swipe up 4	plum
+```
+
+#### `dzen2`
+```
+echo '^ca(1,plum notify)notify^ca()' | dzen2 -p 
 ```
 
 ### depends
