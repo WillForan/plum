@@ -2,6 +2,7 @@
 use strict; use warnings;
 use v5.28;
 use feature qw(signatures);
+use File::Spec;
 no warnings qw(experimental::signatures experimental::smartmatch);
 
 # quick print of whats going on
@@ -46,23 +47,32 @@ sub debug($msg, $level) { say "DEBUG($level): $msg" if $DEBUG >= $level; }
 
 # find what it is we are told to (file or folder)
 # are there other objects? should we abstract this more?
-# TODO: how do we call '-f' as a variable? 
-sub isfile($search, $textInfo) {
-   return($search) if( -e -r -f $search);
-   # try glob
-   my @g = glob($search);
-   return($g[0]) if($#g == 0 && -e -r -f $g[0]);
+sub find_path($search, $textInfo) {
+   my $cwd=($textInfo->{cwd}||"./");
+   $cwd =  File::Spec->canonpath($cwd); 
+   #debug(Dumper($cwd_rules),4);
+   debug("path testing w/cwd: $cwd", 3);
+   for my $f ($search, "$cwd/$search") {
+      debug("testing path: $f", 4);
+      return($f) if( -e -r $f);
+      # try glob
+      my @g = glob($f);
+      return($g[0]) if($#g == 0 && -e -r $g[0]);
+   }
    # nothing matches
    return("");
+}
+
+# TODO: how do we call '-f' or '-d' as a variable? 
+sub isfile($search,$textInfo) {
+  my $f=find_path($search,$textInfo);
+  return ( $f ne "" && -f $f)?$f:"";
 }
 sub isdir($search, $textInfo) {
-   return($search) if( -e -r -d $search);
-   # try glob
-   my @g = glob($search);
-   return($g[0]) if($#g == 0 && -e -r -d $g[0]);
-   # nothing matches
-   return("");
+  my $f=find_path($search,$textInfo);
+  return ( $f ne "" && -d $f)?$f:"";
 }
+
 # functions get called by looking up from matched string
 our %loc = ( 'file' => \&isfile, 'dir' => \&isdir);
 
@@ -81,9 +91,9 @@ sub cmd_from_section($INFH, $textInfo) {
             next;
          }
          when(m/^from (\w+)/) {
-            $textInfo->{'text'}=`xclip -o $1`;
+            $textInfo->{'text'}=`xclip -o -selection $1`;
          }
-         when(m/^(text|cwd|app|) matches (.*)/) {
+         when(m/^(text|cwd|app) matches (.*)/) {
             debug("matching $2 against $1: $textInfo->{$1}", 1);
             my $re = qr/$2/;
             @matches = ($textInfo->{$1} =~ /$re/);
@@ -98,19 +108,24 @@ sub cmd_from_section($INFH, $textInfo) {
             }
          }
          # add file or dir to the textInfo hash or rule doesn't match
+         # isfile and isdir (future maybe isgit isman ?)
          when(m/^arg is(file|dir) (.*)/){
             my $f_or_d=$1;
             my $totest=$2;
-            $totest =~ s/\$(\w+)/$textInfo->{$1}/ge;
+            $totest =~ s/\$(\d+)/$matches[$1-1]/ge; # replace eg $1
+            $totest =~ s/\$(\w+)/$textInfo->{$1}/ge;# replace eg $mfile
+
+            debug("testing $f_or_d: $totest", 3);
             $textInfo->{$f_or_d} = $loc{$f_or_d}->($totest, $textInfo);
             # if lookup failed, get out of here
             last if ! $textInfo->{$f_or_d};
-            debug("added $1 = ". $matches[$2-1], 1);
+            debug("added $f_or_d = $totest ($textInfo->{$f_or_d})", 1);
          }
          # replace command with anything we've stored
          when(m/^start (.*)/){
             $cmd="$1";
-            $cmd =~ s/\$(\w+)/$textInfo->{$1}/ge;
+            $cmd =~ s/\$(\d+)/$matches[$1-1]/ge; # replace eg $1
+            $cmd =~ s/\$(\w+)/$textInfo->{$1}/ge; # replace eg $file
          }
          when(m/^$/){
             last;
@@ -123,7 +138,7 @@ sub cmd_from_section($INFH, $textInfo) {
   }
      
   # read up to the next section
-  until(/^$/){ $_=<$INFH>; }
+  until(!$_ or /^$/){ $_=<$INFH>; }
   #until(/^$/ or eof($INFH)){ $_=<$INFH>; } 
   # inline::files eof() not supported
   return $cmd;
@@ -152,19 +167,55 @@ sub setup_info() {
    return($textInfo);
 }
 
-# TODO: config file provides regexp for getting cwd
+# get rules for extracting cwd from title
+# N.B. ugly hack to rewind when we find non-matching line
 sub cwd_rules($INFH){
+   my $prev_pos=tell $INFH;
+   my $cwd_rules={};
    while($_=<$INFH>){
       debug("cwd_rules readline: $_",3);
+      next if m/^\s*#/; # okay not to tell pos
       if( m/parse cwd (\S+) (\S+) (\S+)/){
-         debug('parse cwd not implemented yet!', 0);
+         $prev_pos=tell $INFH;
+         $cwd_rules->{$1} = {patt=>$2, replace=>$3};
+         debug("added cwd rule for '$1': '$cwd_rules->{$1}->{patt}' => '$cwd_rules->{$1}->{replace}'", 1);
          next;
+      } else {
+         debug("done with 'parse cwd'", 3);
+         seek $INFH, $prev_pos, 0;
+         last;
       }
    }
+   return($cwd_rules);
 }
+
+sub get_cwd($cwd_rules, $app, $title){
+   # interate through each regex matching an application name
+   foreach my $k (keys %{$cwd_rules}){
+      debug("trying cwd rule $k", 4);
+      # test app against regexp (also key for cwd_rules)
+      my $app_re = qr/$k/;
+      next unless($app =~ /$app_re/);
+
+      debug("rule matched, trying $title against $cwd_rules->{$k}->{patt}", 4);
+      # if app matches, test the title pattern (and replace)
+      my $title_re = qr/$cwd_rules->{$k}->{patt}/;
+      next unless $title =~ s/.*$title_re.*/$cwd_rules->{$k}->{replace}/ee;
+
+      debug("found cwd in title: $title", 3);
+      return($title); # subsitution worked, title is now cwd
+   }
+   return("");
+   # TODO: lsof cwd? not often correct
+}
+
 #
 # 
 sub read_config($INFH, $textInfo){
+   my $cwd_rules = cwd_rules($INFH);
+   $textInfo->{cwd} = get_cwd($cwd_rules, $textInfo->{app}, $textInfo->{title});
+   debug("read cwd as $textInfo->{cwd}",3);
+
    my $cmd = "";
    while(!eof($INFH)){
       # define ways to parse cwd given program regexp, title regexp, reconstruction
@@ -181,16 +232,22 @@ sub read_config($INFH, $textInfo){
 unless(caller){
    my $textInfo = setup_info();
    my $fh;
-   foreach my $f ("$ENV{HOME}/.config/plum.conf","/etc/plum.conf", "./plum.conf") {
-     debug("testing $f",3);
-     next unless -e $f;
-     open($fh, '<', $f) or die "cannot open $f";
-     debug("using $f",1);
+   use File::Basename;
+   my @conf_locs = ("$ENV{HOME}/.config/plum.conf",
+      "/etc/plum.conf",
+      dirname(__FILE__)."/plum.conf");
+   foreach my $f (@conf_locs) {
+      debug("testing $f",3);
+      next unless -e $f;
+      open($fh, '<', $f) or die "cannot open $f";
+      debug("using $f",1);
    }
    if(not $fh){
-     $fh=*DATA if not $fh;
-     debug("using built in plumbing",1);
+      # die "cannot find config file!";
+      $fh=*DATA if not $fh;
+      debug("using built in plumbing",1);
    }
+
    my $cmd=read_config($fh, $textInfo);
    if($cmd eq ""){
       debug("no matching commands for '$textInfo->{text}'",1);
@@ -202,19 +259,36 @@ unless(caller){
 }
 
 __DATA__
-# open http or https in a browser
-text matches ^https?://.*
-text matches hangouts
-start chromium $text
+######
+#
+# create config like:
+#  sed -n '/__DATA__/,$p' plum|sed 1d > plum.conf
+#
+######
 
+## setup how to find cwd from different titles
+# extract from urxvt title
+#   user@host:/path/to/cwd
+# or tmux title
+#   tmux:0:zsh - "user@host: ~/src/thing" 
+parse cwd urxvt|term \w+@\S+?:\s?([~/]\S*?)"?(\s|$) $1
 
-text matches ^https?://.*
-start xdg-open $text
+## what to run with what matches
+# file.pl line 20, near "blah blah"
+text matches (\S+) line (\d+), near "(.*)"
+add file=$1 line=$2 search=$3
+arg isfile $file
+start vimit "$file" +$line +/"$search"
 
-# use ctrl+c clipboard to convert images when in inkscape
-from secondary
-text matches ^(\s+).(jpe?g|gif|ppm)$
-add base=$1 ext=$2
-app matches inkscape
-start convert $text $base.png
+# file.pl line 20
+text matches (\S+) line (\d+)
+add file=$1 line=$2 
+arg isfile $file
+start vimit "$file" +$line
+
+# example using clipboard as well as selection
+# also useful for testing
+text matches ^notify$
+from clipboard
+start xmessage "$text"
 
