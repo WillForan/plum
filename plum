@@ -88,7 +88,7 @@ sub cmd_from_section($INFH, $textInfo) {
       
       given($_) {
          when(/^\s*#/) {
-            debug("skipping comment $_", 1);
+            debug("skipping comment $_", 4);
             next;
          }
          when(m/^from (\w+)/) {
@@ -293,6 +293,12 @@ text matches (\S+) line (\d+), near "(.*)"
 add file=$1 line=$2 search=$3
 arg isfile $file
 start vimit "$file" +$line +/"$search"
+
+# "file.py", line 20
+text matches "(\S+)", line (\d+)
+add file=$1 line=$2
+arg isfile $file
+start vimit "$file" +$line
 
 # file.pl line 20
 text matches (\S+) line (\d+)
