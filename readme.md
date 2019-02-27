@@ -52,7 +52,11 @@ gesture: swipe up 4	plum
 
 #### `dzen2`
 ```
+# bar
 echo '^ca(1,plum notify)notify^ca()' | dzen2 -p 
+
+# menu
+read XP YP <<< $(getcurpos); echo -e "\nplum notify\nplum" | dzen2 -y "$YP" -x "$XP" -l 7 -tw 125 -ta l -w 125 -m -p -e 'onstart=uncollapse;button1=menuexec;leaveslave=exit;button3=exit'
 ```
 
 ### depends
@@ -72,6 +76,10 @@ see `vimit`
 
 ## TODO
 - additional contexts in config. eg: `context workspace i3-msg -t get_workspace| jq ...`
+
+## References
+- dzen as a menu: https://bbs.archlinux.org/viewtopic.php?id=47833
+- mouse position code: https://github.com/Conservatory/quark/blob/master/python-browser-8/getcurpos.c (Robert Manea via Karl Fogel)
 
 ## Other thoughts
 * use as a urxvt plugin with help from [`keyboard-select`](https://github.com/muennich/urxvt-perls)
