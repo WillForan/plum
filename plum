@@ -6,8 +6,8 @@ use File::Spec;
 no warnings qw(experimental::signatures experimental::smartmatch);
 
 # quick print of whats going on
-our $DEBUG=0;
-$DEBUG=$ENV{PLUM_DEBUG} if $ENV{PLUM_DEBUG};
+our $DEBUG=$ENV{PLUM_DEBUG}||0;
+our $PLUM_ECHO=$ENV{PLUM_ECHO}||0;
 sub debug($msg, $level) { say "DEBUG($level): $msg" if $DEBUG >= $level; }
 
 #
@@ -265,7 +265,12 @@ unless(caller){
    }
 
    debug("exec $cmd",3);
-   exec $cmd;
+   if($PLUM_ECHO){
+      say $cmd;
+      exit;
+   } else {
+      exec $cmd;
+   }
 }
 
 __DATA__
@@ -292,6 +297,8 @@ start xmessage "$title: $text"
 
 ## what to run with what matches
 # open web links
+# N.B. 'from primary' is necessary to reset query after 'from argv'
+from primary 
 text matches (https?://[^\s()]+)
 start xdg-open "$1"
 
@@ -309,12 +316,11 @@ start vimit "$file" +$line
 
 # file.pl line 20
 text matches (\S+) line (\d+)
-add file=$1 line=$2 
+add file=$1 line=$2
 arg isfile $file
 start vimit "$file" +$line
 
-# example using clipboard as well as selection
-# also useful for testing
-text matches ^notify$
-from clipboard
-start xmessage "$text"
+# least specific file match
+text matches (\S+)
+arg isfile $1
+start vimit "$file"

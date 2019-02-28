@@ -65,6 +65,45 @@ read XP YP <<< $(getcurpos); echo -e "\nplum notify\nplum" | dzen2 -y "$YP" -x "
 * shell rc configuration like `PS1="\033]0;${USER}@${HOSTNAME%%.*}:${PWD/$HOME/~}\007..."` 
 * key/chord/gesture launcher (e.g. `sxhkd`, `xbindkeys`, `easystroke`, `libinput-gesutre`)
 
+#### Titles
+
+current working directory is often determined by the title of the focused window. Here are some snippets to help set that.
+
+vim: 
+
+```
+set title
+autocmd BufEnter * let &titlestring = $USER . "@".hostname() . ":" . expand("%:p:h") .' ' . expand("%F")  . ' [vim]'
+```
+
+zsh:
+
+```
+ function precmd () {
+   window_title="\033]0;$USER@$HOSTNAME:${PWD}\007"
+   echo -ne "$window_title"
+ }
+ # before overwritting, check 
+ #  type -f precmd
+ # and
+ # type -f $(print -l ${(ok)functions})| less +/set_title
+ # which for me pointed to grml_control_xterm_title
+
+ grml_control_xterm_title () {case $TERM in (xterm*|rxvt*) set_title "${(%):-"%n@%m:%~"}" "$1" ;;esac; }
+
+```
+
+bash:
+
+```
+  export PROMPT_COMMAND='echo -ne "\033]0;${USER}@${HOSTNAME%%.*}:${PWD/$HOME/~}\007"'
+  # see 
+  #  env | grep COM
+  # before redefining
+  #  eval $(fasd --init auto) 
+  # may have already set the title and done other useful things
+```
+
 ### Editors
 see `vimit` 
  - fails for remote ssh + vim
