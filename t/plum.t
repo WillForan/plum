@@ -3,7 +3,7 @@ use strict; use warnings;
 
 # run as t/plumb.t so ./plum is in the right place
 require './plum';
-use Test::Simple tests => 4;
+use Test::Simple tests => 5;
 
 our $DEBUG=0;
 my $textInfo = {};
