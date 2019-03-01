@@ -2,9 +2,10 @@
 # get x,y mouse pointer position
 read XP YP <<< $(getcurpos)
 
+[ -z "$1" ] && ydelta=25 || ydelta=$1
 # N.B. YP-25 might be too high 
 # -- if the mouse if off the main bar, dzen will auto close
-cat <<EOF | dzen2 -y $((($YP-25))) -x "$((($XP-10)))" -l 3 -w 300 -m -p -e 'onstart=uncollapse;button1=menuexec;leaveslave=exit;button3=exit;'
+cat <<EOF | dzen2 -y $((($YP-$ydelta))) -x "$((($XP-10)))" -l 3 -w 300 -m -p -e 'onstart=uncollapse;button1=menuexec;leaveslave=exit;button3=exit;'
 
 plum
 plum notify
