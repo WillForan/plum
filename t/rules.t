@@ -3,10 +3,10 @@ use strict; use warnings;
 
 # run as t/plumb.t so ./plum is in the right place
 require './plum';
-use Test::Simple tests => 9;
-use Inline::Files -backup;
+use Test::Simple tests => 15;
+use Inline::Files;
 
-our $DEBUG=0;
+#our $DEBUG=0;
 my $textInfo = {};
 my $cmd_out = "";
 
@@ -40,6 +40,20 @@ $cmd_out = cmd_from_section(*PATTERN, $textInfo) ;
 ok($cmd_out eq "", "section: bad path");
 
 
+# not pattern
+seek NOTPATTERN,0,0;
+$textInfo = {'text' => '/path/to/img.gif','app'=>'bin/inkscape'};
+$cmd_out = cmd_from_section(*NOTPATTERN, $textInfo) ;
+ok($cmd_out eq "convert /path/to/img.gif /path/to/img.png", "section: !matches");
+
+# fail b/c !matches
+seek NOTPATTERN,0,0;
+$textInfo = {'text' => '/path/to/img_converted.gif','app'=>'bin/inkscape'};
+$cmd_out = cmd_from_section(*NOTPATTERN, $textInfo) ;
+ok($cmd_out eq "", "section: !matches");
+
+
+
 # check isfile
 $textInfo = {'text' => 't/plum.t'};
 $cmd_out = cmd_from_section(*ISFILE, $textInfo) ;
@@ -50,6 +64,17 @@ $textInfo = {'text' => 't/DNE'};
 $cmd_out = cmd_from_section(*ISFILE, $textInfo) ;
 ok($cmd_out eq "", "section: not isfile");
 
+# notisfile
+# check isfile
+$textInfo = {'text' => 't/plum.t'};
+$cmd_out = cmd_from_section(*NOTISFILE, $textInfo) ;
+ok($cmd_out eq "", "section: not notisfile");
+
+seek NOTISFILE,0,0;
+$textInfo = {'text' => 't/DNE'};
+$cmd_out = cmd_from_section(*NOTISFILE, $textInfo) ;
+ok($cmd_out eq "notfile t/DNE", "section: notisfile");
+
 
 
 # check isdir
@@ -58,8 +83,17 @@ $cmd_out = cmd_from_section(*ISDIR, $textInfo) ;
 ok($cmd_out eq "pcmanfm t/", "section: isdir");
 seek ISDIR,0,0;
 $textInfo = {'text' => 'DNE'};
-$cmd_out = cmd_from_section(*ISFILE, $textInfo) ;
+$cmd_out = cmd_from_section(*ISDIR, $textInfo) ;
 ok($cmd_out eq "", "section: not isdir");
+
+# !isdir
+$textInfo = {'text' => 'DNE'};
+$cmd_out = cmd_from_section(*NOTISDIR, $textInfo) ;
+ok($cmd_out eq "notdir DNE", "section: notisdir");
+seek NOTISDIR,0,0;
+$textInfo = {'text' => 't/'};
+$cmd_out = cmd_from_section(*NOTISDIR, $textInfo) ;
+ok($cmd_out eq "", "section: fail notisdir");
 
 
 
@@ -74,16 +108,33 @@ add base=$1 ext=$2
 app matches inkscape
 start convert $text $base.png
 
+__NOTPATTERN__
+# use ctrl+c clipboard to convert images when in inkscape
+text matches ^(\S+).(jpe?g|gif|ppm)$
+add base=$1 ext=$2
+base !matches (converted)
+app matches inkscape
+start convert $text $base.png
+
 __ISFILE__
 text matches (\S+)
 arg isfile $1
 start vimit $file
 
+__NOTISFILE__
+text matches (\S+)
+arg !isfile $1
+start notfile $text
+
 __ISDIR__
 text matches (\S+)
-add mdir=$1
-arg isdir $mdir
+arg isdir $1
 start pcmanfm $dir
+
+__NOTISDIR__
+text matches (\S+)
+arg !isdir $1
+start notdir $1
 
 __CLIPBOARD__
 from secondary

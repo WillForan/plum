@@ -4,7 +4,7 @@ use strict; use warnings;
 # run as t/plumb.t so ./plum is in the right place
 require './plum';
 use Test::Simple tests => 2;
-use Inline::Files -backup;
+use Inline::Files;
 
 our $DEBUG=0;
 

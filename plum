@@ -103,13 +103,22 @@ sub cmd_from_section($INFH, $textInfo) {
                default {$textInfo->{'text'}="";}
             }
          }
-         when(m/^(text|cwd|app) matches (.*)/) {
-            debug("matching $2 against $1: $textInfo->{$1}", 1);
-            my $re = qr/$2/;
-            @matches = ($textInfo->{$1} =~ /$re/);
-            # if no matches, we dont do anything
-            debug("no matches '$_'", 1) if $#matches < 0;
-            last if $#matches < 0;
+         when(m/^(\S+) (!)?matches (.*)/) {
+            # likely text|cwd|app|argc, but could be e.g. base from "add base=$1"
+            my $match_arg = $1; 
+            my $wantnomatch = defined $2;
+            debug(($wantnomatch?'!':'').
+                  "matching '$3' against $match_arg: $textInfo->{$match_arg}", 2);
+            my $re = qr/$3/;
+            @matches = ($textInfo->{$match_arg} =~ /$re/);
+            debug(" matches: '@matches'  wantnomatch: $wantnomatch", 2); 
+            # fail if no matches and we wanted a match
+            last if !$wantnomatch && $#matches < 0; 
+            # fail if match and we wanted none
+            last if  $wantnomatch && $#matches >= 0;
+            # pass:
+            # have no matches and wanted no matches
+            # or have matches and wanted them
          }
          when(m/^add (.*)/){
             while( m/(\w+)=\$(\d+)/g) {
@@ -119,23 +128,33 @@ sub cmd_from_section($INFH, $textInfo) {
          }
          # add file or dir to the textInfo hash or rule doesn't match
          # isfile and isdir (future maybe isgit isman ?)
-         when(m/^arg is(file|dir) (.*)/){
-            my $f_or_d=$1;
-            my $totest=$2;
+         when(m/^arg (!)?is(file|dir) (.*)/){
+            my $f_or_d=$2;
+            my $wantnomatch = defined $1;
+            my $totest=$3;
             $totest =~ s/\$(\d+)/$matches[$1-1]/ge; # replace eg $1
             $totest =~ s/\$(\w+)/$textInfo->{$1}/ge;# replace eg $mfile
 
-            debug("testing $f_or_d: $totest", 3);
-            $textInfo->{$f_or_d} = $loc{$f_or_d}->($totest, $textInfo);
+            debug("testing $f_or_d: $totest; wantno $wantnomatch", 3);
+            my $fs_loc = $loc{$f_or_d}->($totest, $textInfo);
             # if lookup failed, get out of here
-            last if ! $textInfo->{$f_or_d};
-            debug("added $f_or_d = $totest ($textInfo->{$f_or_d})", 1);
+            last if ! $wantnomatch and $fs_loc eq "";
+            # lookup didn't fail but we wanted it to
+            last if $wantnomatch and $fs_loc ne "";
+
+            if($fs_loc){
+               $textInfo->{$f_or_d}=$fs_loc;
+               debug("added $f_or_d = $totest ($fs_loc)", 1);
+            } else {
+               debug("'$totest' not $f_or_d as desired, continue", 1);
+            }
          }
          # replace command with anything we've stored
          when(m/^start (.*)/){
             $cmd="$1";
             $cmd =~ s/\$(\d+)/$matches[$1-1]/ge; # replace eg $1
             $cmd =~ s/\$(\w+)/$textInfo->{$1}/ge; # replace eg $file
+            debug("have cmd: '$cmd'",2) if($cmd);
          }
          when(m/^$/){
             last;
@@ -268,6 +287,11 @@ unless(caller){
    if($PLUM_ECHO){
       say $cmd;
       exit;
+   }
+   # if command is quoted, use sh (for eg pipes)
+   # otherwies run it raw
+   if($cmd =~ m/^['"]/) {
+      exec "sh -c $cmd";
    } else {
       exec $cmd;
    }

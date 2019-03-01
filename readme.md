@@ -64,6 +64,7 @@ The second section are sets of rules for matching text, extracting variables, an
 * `add` - add variables from match to namespace
 * `arg` - test argument (currently only `isfile` and `isdir`), create/overwrite `file` or `dir` variable
 * `start` - run a command
+* `!` varients `!isfile`,`!isdir`, `!matches`
 
 Though not strictly true, the functional minimum for a rule set is `matches` + `start`
 
@@ -150,7 +151,12 @@ see `vimit`
 #### emacs
 `emacsclient` would be much easier. Plus tramp provides easy access to remote files. But one crazy term buffer or notmuch query will lock up all buffers. Independent processes are a feature.
 
-## TODO
+## Hacking
+### Notes
+* debuging: `export PLUM_DEBUG=9`
+* tests:    `find -iname '*t' | xargs -n1 perl`
+
+### TODO
 - additional contexts in config. eg: `context workspace i3-msg -t get_workspace| jq ...`
 
 ## References
