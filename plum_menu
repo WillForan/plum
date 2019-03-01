@@ -8,5 +8,6 @@ read XP YP <<< $(getcurpos)
 cat <<EOF | dzen2 -y $((($YP-$ydelta))) -x "$((($XP-10)))" -l 3 -w 300 -m -p -e 'onstart=uncollapse;button1=menuexec;leaveslave=exit;button3=exit;'
 
 plum
+plum search
 plum notify
 EOF
