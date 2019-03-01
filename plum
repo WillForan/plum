@@ -295,6 +295,12 @@ text matches ^notify$
 from primary
 start xmessage "$title: $text"
 
+# search the web
+from argv # text is already argv from above, but doesn't hurt here:
+text matches ^search$
+from primary
+start xdg-open "https://www.google.com/search?q=$text"
+
 ## what to run with what matches
 # open web links
 # N.B. 'from primary' is necessary to reset query after 'from argv'
