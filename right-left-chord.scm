@@ -50,6 +50,8 @@
             (display "b3 up") (newline)
             (reset-bindings)
             (run-command "xte 'mouseclick 3'")
+            ;(run-command "xdotool click 3")
+            ;(run-command "xdotool keydown Pointer_Button3 sleep .01 keyup Pointer_Button3")
             (display "simulate b:3") (newline)
 
             ; sleep for .4s b/c simulated button up is comming
