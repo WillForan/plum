@@ -1,0 +1,38 @@
+#!/usr/bin/env tclsh
+package require Tk
+set bg #394249
+set font "Source Code Pro"
+set font_size 12
+set h 20
+
+proc toggledock {} {
+   global h
+   if {[wm attributes . -type ] == "dock"} {
+      wm attributes . -type toolbar
+      .b configure -background red
+   } else {
+      wm attributes . -type dock
+      .b configure -background #333333
+   }
+   set gstr [join [list [winfo width . ] "x" $h "+0+0" ] ""]
+   # toggle window to for WM to see type change
+   wm withdraw .
+   wm deiconify .
+   wm geometry . $gstr
+}
+
+
+# add detatch button and text entry box
+# entry width is stupidly long -- we'll never see the end
+. configure -background $bg
+entry .tx -textvariable txline -width 1000 -relief flat  -background $bg  -foreground white -highlightthickness 0 
+.tx configure -font [list $font $font_size ]
+button .b -text " " -command toggledock   -background #333333
+place .b  -width 20 -height $h -y 0 -x 0 
+place .tx     -x 20 -height $h -y 0 
+
+.tx insert 0 { plum }
+bind .tx <ButtonPress-3> { exec plum frombar }
+
+wm geometry . 0x$h
+wm attributes . -type dock
