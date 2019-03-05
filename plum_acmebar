@@ -4,12 +4,14 @@ set bg #394249
 set font "Source Code Pro"
 set font_size 12
 set h 20
+set delm " ∎ "
+
 
 proc toggledock {} {
    global h
    if {[wm attributes . -type ] == "dock"} {
       wm attributes . -type toolbar
-      .b configure -background red
+      .b configure -background red 
    } else {
       wm attributes . -type dock
       .b configure -background #333333
@@ -20,19 +22,60 @@ proc toggledock {} {
    wm deiconify .
    wm geometry . $gstr
 }
+proc select_around {txline delm {runit 0}} {
+   set dchar [ string trim $delm " "]
+
+   set pos [.tx index "insert"]
+   set rest [ string range $txline $pos end]
+   set nextd [string first $dchar $rest]
+
+   set prev [ string range $txline 0   $pos]
+   set prevd [string last $dchar $prev]
+   set prevd [expr [string length $prev ] - $prevd]
+
+   if {$nextd < 0} { set nextd [string length $rest]}
+   if {$prevd < 0} { set prevd 0}
+   set f [expr $pos - $prevd + [string length $delm] -1]
+   set l [expr $pos + $nextd ]
+
+   if {$runit == 0} {
+      .tx selection range $f $l 
+   } else {
+       return [string range $txline $f $l]
+   }
+}
+proc exec_plum {txt dlm} {
+   # todo: move text cursor to where mouse clicked
+   set region [select_around $txt $dlm 1]
+   set region [string trim $region $dlm]
+   set region [string trim $region " "]
+   puts "selection: $region"
+   exec {*}plum $region &
+}
 
 
 # add detatch button and text entry box
 # entry width is stupidly long -- we'll never see the end
 . configure -background $bg
-entry .tx -textvariable txline -width 1000 -relief flat  -background $bg  -foreground white -highlightthickness 0 
+entry .tx -textvariable txline \
+          -width 1000 -relief flat \
+          -background $bg  -foreground white \
+          -highlightthickness 0 
 .tx configure -font [list $font $font_size ]
-button .b -text " " -command toggledock   -background #333333
+button .b -text " " -command toggledock \
+          -background #333333
 place .b  -width 20 -height $h -y 0 -x 0 
 place .tx     -x 20 -height $h -y 0 
 
-.tx insert 0 { plum }
-bind .tx <ButtonPress-3> { exec plum frombar }
+set cmdlist [ list {c<perl -pe 's/^\t|^\s{4}//'} \
+                   {c<sed 's/^/    /'}]
+.tx insert 0 [join $cmdlist $delm]
+
+bind .tx <Escape> { toggledock }
+bind .tx <Control-ButtonPress-3> { toggledock }
+bind .tx <Shift-ButtonPress-3> { select_around $txline $delm 0 }
+bind .tx <ButtonPress-3> { exec_plum $txline $delm }
+bind .tx <Return> { .tx insert [.tx index "insert"] $delm }
 
 wm geometry . 0x$h
 wm attributes . -type dock

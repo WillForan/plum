@@ -338,6 +338,13 @@ from argv
 text matches ^>(.*)$
 start "xclip -o | $1 | xclip -i"
 
+# overwrite highlighted text copied to clipboard
+# "c<sed 's/^    //'" -> unindent
+from argv
+text matches ^c<(.*)$
+#start "xclip -o -selection clipboard | $1 | xargs -r -i -0 xdotool type '{}'"
+start "xclip -o -selection clipboard | $1 | xclip -i -selection clipboard"
+
 # search the web
 from argv # text is already argv from above, but doesn't hurt here:
 text matches ^search$
@@ -368,6 +375,10 @@ text matches (\S+) line (\d+)
 add file=$1 line=$2
 arg isfile $file
 start vimit "$file" +$line
+
+text matches ^(20\d{2}-\d{2}-\d{2} ?(\d{2}:\d{2})?).*\s([A-Z]{4})(\s|$)
+add date=$1 ticker=$2
+start xdg-open "https://elite.finviz.com/quote.ashx?t=$1,$2,$3,&ty=c&ta=2&p=i1"
 
 # least specific file match
 text matches (\S+)
