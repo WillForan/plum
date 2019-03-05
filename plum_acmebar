@@ -11,7 +11,7 @@ proc toggledock {} {
    global h
    if {[wm attributes . -type ] == "dock"} {
       wm attributes . -type toolbar
-      .b configure -background red 
+      .b configure -background green
    } else {
       wm attributes . -type dock
       .b configure -background #333333
@@ -44,13 +44,44 @@ proc select_around {txline delm {runit 0}} {
        return [string range $txline $f $l]
    }
 }
-proc exec_plum {txt dlm} {
-   # todo: move text cursor to where mouse clicked
-   set region [select_around $txt $dlm 1]
+proc exec_plum {txt dlm xpos} {
+   global .tx
+   try {
+      set fi [.tx index sel.first] 
+      set li [.tx index sel.last] 
+      set region [string range $txt $fi $li]
+      #puts "$txt -- from $fi to $li: '$region'"
+   } trap {} {} {
+      .tx icursor @$xpos
+      set region [select_around $txt $dlm 1]
+      #puts "no sel, pick: $region"
+   }
    set region [string trim $region $dlm]
    set region [string trim $region " "]
-   puts "selection: $region"
-   exec {*}plum $region &
+   .b configure -background red 
+   update
+   
+   # fails for starting with <anything... or |one-word (no arguments)
+   #eval exec [join [list plum "" $region] ] &
+
+   # what if command takes a while to run? 
+   # signify with a button color
+   set f [file tempfile fn "/tmp/plum.lastcmd"]
+   set cmd "plum \"`cat $fn`\""
+   puts "$cmd"
+
+   # write, close, run, remove
+   puts $f $region
+   close $f
+   puts "running: plum '$region'"
+   # will wait for changes to x11 clipboard?!
+   catch { exec sh -c $cmd }
+   file delete $fn
+
+   # adjust button back
+   .b configure -background #333333 
+
+
 }
 
 
@@ -68,13 +99,19 @@ place .b  -width 20 -height $h -y 0 -x 0
 place .tx     -x 20 -height $h -y 0 
 
 set cmdlist [ list {c<perl -pe 's/^\t|^\s{4}//'} \
-                   {c<sed 's/^/    /'}]
+                   {c<sed 's/^/    /'} \
+                   {<sed 's/^/    /'} \
+                   {|xargs xmessage} \
+                   {notify} ]
 .tx insert 0 [join $cmdlist $delm]
 
 bind .tx <Escape> { toggledock }
 bind .tx <Control-ButtonPress-3> { toggledock }
-bind .tx <Shift-ButtonPress-3> { select_around $txline $delm 0 }
-bind .tx <ButtonPress-3> { exec_plum $txline $delm }
+bind .tx <Shift-ButtonPress-3> { 
+   .tx icursor @%x
+   select_around $txline $delm 0
+}
+bind .tx <ButtonPress-3> { exec_plum $txline $delm %X }
 bind .tx <Return> { .tx insert [.tx index "insert"] $delm }
 
 wm geometry . 0x$h
