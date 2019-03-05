@@ -1,0 +1,128 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+from tkinter import Tk, Entry, Button
+
+bg = "#394249"
+font = "Source Code Pro"
+font_size = 12
+h = 20
+delm = " ∎ "
+
+
+def toggledock():
+    print("hi")
+    print(m.attributes("-type"))
+
+
+m = Tk()
+m.attributes(-type="dock")
+
+e = Entry(width=1000, relief="flat", bg=bg,
+          fg="white", highlightthickness=0,
+          font=[font, font_size])
+b = Button(text=" ", background=bg, command=toggledock)
+b.place(width=20, height=h, y=0, x=0)
+e.place(    x=20, height=h, y=0)
+
+m.mainloop()
+
+#proc toggledock {} {
+#   global h
+#   if {[wm attributes . -type ] == "dock"} {
+#      wm attributes . -type toolbar
+#      .b configure -background green
+#   } else {
+#      wm attributes . -type dock
+#      .b configure -background #333333
+#   }
+#   set gstr [join [list [winfo width . ] "x" $h "+0+0" ] ""]
+#   # toggle window to for WM to see type change
+#   wm withdraw .
+#   wm deiconify .
+#   wm geometry . $gstr
+#}
+#proc select_around {txline delm {runit 0}} {
+#   set dchar [ string trim $delm " "]
+#
+#   set pos [.tx index "insert"]
+#   set rest [ string range $txline $pos end]
+#   set nextd [string first $dchar $rest]
+#
+#   set prev [ string range $txline 0   $pos]
+#   set prevd [string last $dchar $prev]
+#   set prevd [expr [string length $prev ] - $prevd]
+#
+#   if {$nextd < 0} { set nextd [string length $rest]}
+#   if {$prevd < 0} { set prevd 0}
+#   set f [expr $pos - $prevd + [string length $delm] -1]
+#   set l [expr $pos + $nextd ]
+#
+#   if {$runit == 0} {
+#      .tx selection range $f $l 
+#   } else {
+#       return [string range $txline $f $l]
+#   }
+#}
+#proc exec_plum {txt dlm xpos} {
+#   global .tx
+#   try {
+#      set fi [.tx index sel.first] 
+#      set li [.tx index sel.last] 
+#      set region [string range $txt $fi $li]
+#      #puts "$txt -- from $fi to $li: '$region'"
+#   } trap {} {} {
+#      .tx icursor @$xpos
+#      set region [select_around $txt $dlm 1]
+#      #puts "no sel, pick: $region"
+#   }
+#   set region [string trim $region $dlm]
+#   set region [string trim $region " "]
+#   .b configure -background red 
+#   update
+#   
+#   # fails for starting with <anything... or |one-word (no arguments)
+#   #eval exec [join [list plum "" $region] ] &
+#
+#   # what if command takes a while to run? 
+#   # signify with a button color
+#   set f [file tempfile fn "/tmp/plum.lastcmd"]
+#   set cmd "plum \"`cat $fn`\""
+#   puts "$cmd"
+#
+#   # open, write, close, run, remove
+#   open $fn w
+#   puts $f $region
+#   close $f
+#   puts "running: plum '$region'"
+#   catch { exec sh -c $cmd }
+#   file delete $fn
+#   puts "done"
+#
+#   # adjust button back
+#   .b configure -background #333333 
+#
+#
+#}
+#
+#
+## add detatch button and text entry box
+## entry width is stupidly long -- we'll never see the end
+#
+#set cmdlist [ list {c<perl -pe 's/^\t|^\s{4}//'} \
+#                   {c<sed 's/^/    /'} \
+#                   {<sed 's/^/    /'} \
+#                   {|xargs xmessage} \
+#                   {notify} ]
+#.tx insert 0 [join $cmdlist $delm]
+#
+#bind .tx <Escape> { toggledock }
+#bind .tx <Control-ButtonPress-3> { toggledock }
+#bind .tx <Shift-ButtonPress-3> { 
+#   .tx icursor @%x
+#   select_around $txline $delm 0
+#}
+#bind .tx <ButtonPress-3> { exec_plum $txline $delm %X }
+#bind .tx <Return> { .tx insert [.tx index "insert"] $delm }
+#
+#wm geometry . 0x$h
+#wm attributes . -type dock
