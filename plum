@@ -332,13 +332,13 @@ from argv
 text matches ^\|
 start "xclip -o $text"
 
-# replace selection with another cmd
-# if e.g. ">xargs xmessage"
+# replace selection with output from other command
+# if e.g. "<perl -pe 's/^\t|^\d{4}//'"  -- unindent
 from argv
-text matches ^>(.*)$
+text matches ^<(.*)$
 start "xclip -o | $1 | xclip -i"
 
-# overwrite highlighted text copied to clipboard
+# overwrite clipboard text with piped command output
 # "c<sed 's/^    //'" -> unindent
 from argv
 text matches ^c<(.*)$
