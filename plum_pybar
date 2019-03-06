@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from tkinter import Tk, Entry, Button
+from subprocess import run
 
 bg = "#394249"
 font = "Source Code Pro"
@@ -9,120 +10,107 @@ h = 20
 delm = " ∎ "
 
 
-def toggledock():
-    print("hi")
-    print(m.attributes("-type"))
+def toggledock(mouse=None):
+    cur = m.attributes("-type")
+    geom_str = "%dx%d+0+0" % (m.winfo_width(), h)
+    if cur[0] != "dialog":
+        m.attributes("-type", "dialog")
+        b.configure(background="green")
+    else:
+        m.attributes("-type", "dock")
+        b.configure(background=bg)
+
+    if mouse is not None:
+        e.icursor("@%d" % mouse.x)
+
+    # toggle window to for WM to see type change
+    m.withdraw()
+    m.deiconify()
+    m.geometry(geom_str)
 
 
 m = Tk()
-m.attributes(-type="dock")
-
 e = Entry(width=1000, relief="flat", bg=bg,
           fg="white", highlightthickness=0,
           font=[font, font_size])
 b = Button(text=" ", background=bg, command=toggledock)
 b.place(width=20, height=h, y=0, x=0)
-e.place(    x=20, height=h, y=0)
+e.place(x=20,     height=h, y=0)
 
+
+# ## initial text
+cmdlist = ["c<perl -pe 's/^\t|^\s{4}//'",
+           "c<sed 's/^/    /'",
+           "<sed 's/^/    /'",
+           "|xargs xmessage",
+           "notify"]
+e.insert(0, delm.join(cmdlist))
+
+
+#  ## Bindings
+def find_around(select=False):
+    s = e.get()
+    d = delm.rstrip().lstrip()
+    i = e.index("insert")
+
+    # find closest delim
+    ni = s.find(d, i)
+    pi = s.rfind(d, 0, i)
+
+    # go to end if not match, otherwise remove deliminter
+    if ni == -1:
+        ni = len(s)
+    else:
+        ni -= 1
+    if pi == -1:
+        pi = 0
+    else:
+        pi += 2
+
+    # pickout region
+    region = s[pi:ni]
+    print("region: " + region)
+
+    # should we select it?
+    if select:
+        e.selection_range(pi, ni)
+    return(region)
+
+
+def plum_cmd(cmd):
+    oldbg = b.configure("background")[4]
+    b.configure(background="red")
+    print(cmd)
+    run(['plum', cmd])
+    b.configure(background=oldbg)
+
+
+def send_cmd(mouse, select_only=False):
+    if select_only:
+        e.icursor("@%d" % mouse.x)
+        find_around(select=True)
+        return(None)
+
+    if e.selection_present():
+        cmd = e.get()[e.index("sel.first"):e.index("sel.last")]
+    else:
+        e.icursor("@%d" % mouse.x)
+        cmd = find_around(select=False)
+    plum_cmd(cmd)
+
+
+def insert_delm(x):
+    e.insert(e.index("insert"), delm)
+
+
+e.bind("<Escape>", lambda x: toggledock())
+e.bind("<Control-ButtonPress-3>", lambda x: toggledock(x))
+e.bind("<Shift-ButtonPress-3>", lambda x: send_cmd(x, select_only=True))
+e.bind("<ButtonPress-3>", lambda x: send_cmd(x))
+e.bind("<Return>", insert_delm)
+
+
+# startup -- NB width doesn't mater for dock
+m.attributes("-type", "dock")
+m.geometry("0x%d" % h)
 m.mainloop()
-
-#proc toggledock {} {
-#   global h
-#   if {[wm attributes . -type ] == "dock"} {
-#      wm attributes . -type toolbar
-#      .b configure -background green
-#   } else {
-#      wm attributes . -type dock
-#      .b configure -background #333333
-#   }
-#   set gstr [join [list [winfo width . ] "x" $h "+0+0" ] ""]
-#   # toggle window to for WM to see type change
-#   wm withdraw .
-#   wm deiconify .
-#   wm geometry . $gstr
-#}
-#proc select_around {txline delm {runit 0}} {
-#   set dchar [ string trim $delm " "]
-#
-#   set pos [.tx index "insert"]
-#   set rest [ string range $txline $pos end]
-#   set nextd [string first $dchar $rest]
-#
-#   set prev [ string range $txline 0   $pos]
-#   set prevd [string last $dchar $prev]
-#   set prevd [expr [string length $prev ] - $prevd]
-#
-#   if {$nextd < 0} { set nextd [string length $rest]}
-#   if {$prevd < 0} { set prevd 0}
-#   set f [expr $pos - $prevd + [string length $delm] -1]
-#   set l [expr $pos + $nextd ]
-#
-#   if {$runit == 0} {
-#      .tx selection range $f $l 
-#   } else {
-#       return [string range $txline $f $l]
-#   }
-#}
-#proc exec_plum {txt dlm xpos} {
-#   global .tx
-#   try {
-#      set fi [.tx index sel.first] 
-#      set li [.tx index sel.last] 
-#      set region [string range $txt $fi $li]
-#      #puts "$txt -- from $fi to $li: '$region'"
-#   } trap {} {} {
-#      .tx icursor @$xpos
-#      set region [select_around $txt $dlm 1]
-#      #puts "no sel, pick: $region"
-#   }
-#   set region [string trim $region $dlm]
-#   set region [string trim $region " "]
-#   .b configure -background red 
-#   update
-#   
-#   # fails for starting with <anything... or |one-word (no arguments)
-#   #eval exec [join [list plum "" $region] ] &
-#
-#   # what if command takes a while to run? 
-#   # signify with a button color
-#   set f [file tempfile fn "/tmp/plum.lastcmd"]
-#   set cmd "plum \"`cat $fn`\""
-#   puts "$cmd"
-#
-#   # open, write, close, run, remove
-#   open $fn w
-#   puts $f $region
-#   close $f
-#   puts "running: plum '$region'"
-#   catch { exec sh -c $cmd }
-#   file delete $fn
-#   puts "done"
-#
-#   # adjust button back
-#   .b configure -background #333333 
-#
-#
-#}
-#
-#
-## add detatch button and text entry box
-## entry width is stupidly long -- we'll never see the end
-#
-#set cmdlist [ list {c<perl -pe 's/^\t|^\s{4}//'} \
-#                   {c<sed 's/^/    /'} \
-#                   {<sed 's/^/    /'} \
-#                   {|xargs xmessage} \
-#                   {notify} ]
-#.tx insert 0 [join $cmdlist $delm]
-#
-#bind .tx <Escape> { toggledock }
-#bind .tx <Control-ButtonPress-3> { toggledock }
-#bind .tx <Shift-ButtonPress-3> { 
-#   .tx icursor @%x
-#   select_around $txline $delm 0
-#}
-#bind .tx <ButtonPress-3> { exec_plum $txline $delm %X }
-#bind .tx <Return> { .tx insert [.tx index "insert"] $delm }
-#
-#wm geometry . 0x$h
-#wm attributes . -type dock
