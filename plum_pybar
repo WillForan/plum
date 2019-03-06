@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from tkinter import Tk, Entry, Button
 from subprocess import run
@@ -16,9 +16,11 @@ def toggledock(mouse=None):
     if cur[0] != "dialog":
         m.attributes("-type", "dialog")
         b.configure(background="green")
+        e.config(exportselection=True)
     else:
         m.attributes("-type", "dock")
         b.configure(background=bg)
+        e.config(exportselection=False)
 
     if mouse is not None:
         e.icursor("@%d" % mouse.x)
@@ -32,7 +34,8 @@ def toggledock(mouse=None):
 m = Tk()
 e = Entry(width=1000, relief="flat", bg=bg,
           fg="white", highlightthickness=0,
-          font=[font, font_size])
+          font=[font, font_size],
+          exportselection=False)
 b = Button(text=" ", background=bg, command=toggledock)
 b.place(width=20, height=h, y=0, x=0)
 e.place(x=20,     height=h, y=0)
