@@ -45,7 +45,8 @@ e.place(x=20,     height=h, y=0)
 cmdlist = ["c<perl -pe 's/^\t|^\s{4}//'",
            "c<sed 's/^/    /'",
            "<sed 's/^/    /'",
-           "|xargs xmessage",
+           "|xargs -0r xmessage",
+           "ssh s pbpaste>",
            "notify"]
 e.insert(0, delm.join(cmdlist))
 

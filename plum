@@ -95,7 +95,7 @@ sub cmd_from_section($INFH, $textInfo) {
             my $from=$1;
             given($from){
                # get from clipboard
-               $textInfo->{'text'}=`xclip -o -selection $from` when(/clip|secondary|primary/i);
+               $textInfo->{'text'}=`xclip -o -selection $from 2>/dev/null` when(/clip|secondary|primary/i);
                # or arguments
                $textInfo->{'text'}=join(" ", @ARGV) when(/ARGV/i);
                # or what was piped in -- this one is probalby a bad idea
@@ -191,7 +191,7 @@ sub setup_info() {
 
    # fetch clipboard
    # TODO: use perl lib for cross platform? will require cpanm install
-   $textInfo->{text} = `xclip -o`;
+   $textInfo->{text} = `xclip -o 2>/dev/null`;
    debug("text: $textInfo->{text}",1);
    return($textInfo);
 }
@@ -332,11 +332,29 @@ from argv
 text matches ^\|
 start "xclip -o $text"
 
-# replace selection with output from other command
+# pipe secondary xclip to another command
+# if e.g. "c|xargs xmessage"
+from argv
+text matches ^c(\|.*)
+start "xclip -selection clipboard -o $1"
+
+# replace selection with output from other command using current selection
 # if e.g. "<perl -pe 's/^\t|^\d{4}//'"  -- unindent
 from argv
 text matches ^<(.*)$
 start "xclip -o | $1 | xclip -i"
+
+# replace selection with output from other command
+# if e.g. "ssh s pbpaste>"  -- unindent
+from argv
+text matches ^(.*)>$
+start " $1 | xclip -i"
+
+# replace clipboard with output from other command
+# if e.g. "ssh s pbpaste >c"  -- unindent
+from argv
+text matches ^(.*)>c$
+start " $1 | xclip -i -selection clipboard"
 
 # overwrite clipboard text with piped command output
 # "c<sed 's/^    //'" -> unindent
