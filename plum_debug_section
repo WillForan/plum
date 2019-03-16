@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-set -eux
-[ $# -lt 2 ] && echo "$0 patternid text" && exit 1
+set -eu
+if [ $# -lt 1 ]; then
+   echo "$0 patternid [[text]|[-primary text] [-clip text] [-argv arg]]" 
+   exit 1
+fi
+
 # plum_debug_section line:ag "readme.md:30"
 # plum_debug_section line:ag -primary "readme.md" -clip "notused" -argv dragon 
 

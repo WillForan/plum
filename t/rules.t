@@ -3,7 +3,7 @@ use strict; use warnings;
 
 # run as t/plumb.t so ./plum is in the right place
 require './plum';
-use Test::Simple tests => 15;
+use Test::Simple tests => 16;
 use Inline::Files;
 
 #our $DEBUG=0;
@@ -20,6 +20,13 @@ $textInfo = {'text' => 'this is not a url'};
 seek SIMPLE,0,0;
 $cmd_out = cmd_from_section(*SIMPLE,$textInfo) ;
 ok($cmd_out eq "", "section: no url match");
+
+# match over newline
+$textInfo = {'text' => '~/path [junk]
+   ls he*
+   here.txt'};
+$cmd_out = cmd_from_section(*NEWLINE,$textInfo) ;
+ok($cmd_out eq "~/path/here.txt", "section: match over newline ($cmd_out)");
 
 
 # using a pattern
@@ -100,6 +107,10 @@ ok($cmd_out eq "", "section: fail notisdir");
 __SIMPLE__
 text matches ^https?://.*
 start xdg-open $text
+
+__NEWLINE__
+text matches ([~/]\S+).*?(\S+)\s*$
+start $1/$2
 
 __PATTERN__
 # use ctrl+c clipboard to convert images when in inkscape

@@ -8,6 +8,9 @@ no warnings qw(experimental::signatures experimental::smartmatch);
 # quick print of whats going on
 our $DEBUG=$ENV{PLUM_DEBUG}||0;
 our $PLUM_ECHO=$ENV{PLUM_ECHO}||0;
+our $PLUM_DEBUGID=$ENV{PLUM_DEBUGID}||0;
+$PLUM_DEBUGID = qr/$PLUM_DEBUGID/ if $PLUM_DEBUGID;
+
 sub debug($msg, $level) { say "DEBUG($level): $msg" if $DEBUG >= $level; }
 
 #
@@ -81,15 +84,34 @@ our %loc = ( 'file' => \&isfile, 'dir' => \&isdir);
 sub cmd_from_section($INFH, $textInfo) {
    my @matches = (); # reg exp matches
    my $cmd = "";
+
+
+   # skip ahead to specific section?
+   # looking for a specific section?
+   if($PLUM_DEBUGID) {
+      $textInfo->{patternid}||="";
+      while($_=<$INFH>) {
+         next unless /patternid (.*)/;
+         $textInfo->{patternid} = $1;
+         debug("checking '$PLUM_DEBUGID' against cur '$textInfo->{patternid}'", 1);
+         last if $textInfo->{patternid} =~ /$PLUM_DEBUGID/;
+      }
+   }
+
    while($_=<$INFH>) {
       chomp;
       debug("section readline: $_",3);
+
+      # remove all comments at the end of lines
       s/ #.*//;
       
       given($_) {
          when(/^\s*#/) {
             debug("skipping comment $_", 4);
             next;
+         }
+         when(m/patternid (.*)/) {
+            $textInfo->{patternid}=$1;
          }
          when(m/^from (\w+)/) {
             my $from=$1;
@@ -109,9 +131,9 @@ sub cmd_from_section($INFH, $textInfo) {
             my $wantnomatch = defined $2;
             debug(($wantnomatch?'!':'').
                   "matching '$3' against $match_arg: $textInfo->{$match_arg}", 2);
-            my $re = qr/$3/;
+            my $re = qr/$3/s;
             @matches = ($textInfo->{$match_arg} =~ /$re/);
-            debug(" matches: '@matches'  wantnomatch: $wantnomatch", 2); 
+            debug("$re matches: '@matches'  wantnomatch: $wantnomatch", 2); 
             # fail if no matches and we wanted a match
             last if !$wantnomatch && $#matches < 0; 
             # fail if match and we wanted none
@@ -157,11 +179,13 @@ sub cmd_from_section($INFH, $textInfo) {
             debug("have cmd: '$cmd'",2) if($cmd);
          }
          when(m/^$/){
+            $textInfo->{patternid}="";  # TODO: make reset function
             last;
          }
          default {
             debug("section: line not understood: $_",0);
-            last
+            $textInfo->{patternid}=""; # TODO: make reset function
+            last;
          }
       }
   }
@@ -249,6 +273,13 @@ sub read_config($INFH, $textInfo){
    while(!eof($INFH)){
       # define ways to parse cwd given program regexp, title regexp, reconstruction
       $cmd=cmd_from_section($INFH, $textInfo);
+
+      # looking for a specific section?
+      if($PLUM_DEBUGID and $textInfo->{patternid} =~ $PLUM_DEBUGID and !$cmd) {
+         debug("$textInfo->{patternid} does not match",1);
+         last
+      }
+
       # read read of lines from failed command parse
       return($cmd) if $cmd;
    };
@@ -314,12 +345,14 @@ parse cwd urxvt|term \w+@\S+?:\s?([~/]\S*?)"?(\s|$) $1
 # show what's selected based on arguments
 # maybe use like it were an acme title window
 # echo '^ca(1,plum notify)notify^ca()' | dzen2 -p 
+patternid argv:notify
 from argv
 text matches ^notify$
 from primary
 start xmessage "$title: $text"
 
 # use dragon drag-n-drop on selected file
+patternid argv:dragon
 from argv
 text matches ^dragon$
 from primary
@@ -328,42 +361,50 @@ start dragon $file
 
 # pipe xclip to another command
 # if e.g. "|xargs xmessage"
+patternid argv:pipe-end
 from argv
 text matches ^\|
 start "xclip -o $text"
 
 # pipe secondary xclip to another command
 # if e.g. "c|xargs xmessage"
+patternid argv:clip-redirect
 from argv
 text matches ^c(\|.*)
 start "xclip -selection clipboard -o $1"
 
 # replace selection with output from other command using current selection
 # if e.g. "<perl -pe 's/^\t|^\d{4}//'"  -- unindent
+#
+patternid argv:prim-redirect
 from argv
 text matches ^<(.*)$
 start "xclip -o | $1 | xclip -i"
 
 # replace selection with output from other command
 # if e.g. "ssh s pbpaste>"  -- unindent
+patternid argv:prim-overwrite
 from argv
 text matches ^(.*)>$
 start " $1 | xclip -i"
 
 # replace clipboard with output from other command
 # if e.g. "ssh s pbpaste >c"  -- unindent
+patternid argv:clip-overwrite
 from argv
 text matches ^(.*)>c$
 start " $1 | xclip -i -selection clipboard"
 
 # overwrite clipboard text with piped command output
 # "c<sed 's/^    //'" -> unindent
+patternid argv:clip-redirect
 from argv
 text matches ^c<(.*)$
 #start "xclip -o -selection clipboard | $1 | xargs -r -i -0 xdotool type '{}'"
 start "xclip -o -selection clipboard | $1 | xclip -i -selection clipboard"
 
 # search the web
+patternid argv:search
 from argv # text is already argv from above, but doesn't hurt here:
 text matches ^search$
 from primary
@@ -372,40 +413,61 @@ start xdg-open "https://www.google.com/search?q=$text"
 ## what to run with what matches
 # open web links
 # N.B. 'from primary' is necessary to reset query after 'from argv'
+patternid web
 from primary 
 text matches (https?://[^\s()]+)
 start xdg-open "$1"
 
 # file.pl line 20, near "blah blah"
+patternid error:perl-near
 text matches (\S+) line (\d+), near "(.*)"
 add file=$1 line=$2 search=$3
 arg isfile $file
 start vimit "$file" +$line +/"$search"
 
 # "file.py", line 20
+patternid error:python
 text matches "(\S+)", line (\d+)
 add file=$1 line=$2
 arg isfile $file
 start vimit "$file" +$line
 
 # file.pl line 20
+patternid error:perl-lineonly
 text matches (\S+) line (\d+)
 add file=$1 line=$2
 arg isfile $file
 start vimit "$file" +$line
 
+# file:line:col like from ag
+patternid line:ag:col
+text matches (\S+)?:(\d+):(\d+)
+add file=$1 line=$2 col=$3
+arg isfile $file
+start vimit "$file" +$line
+
+# file:line like from ag
+patternid line:ag
+text matches (\S+)?:(\d+)
+add file=$1 line=$2
+arg isfile $file
+start vimit "$file" +$line
+
+patternid stock
 text matches ^(20\d{2}-\d{2}-\d{2} ?(\d{2}:\d{2})?).*\s([A-Z]{4})(\s|$)
 add date=$1 ticker=$2
 start xdg-open "https://elite.finviz.com/quote.ashx?t=$1,$2,$3,&ty=c&ta=2&p=i1"
 
 # least specific file match
+patternid file
 text matches (\S+)
 arg isfile $1
 start vimit "$file"
 
 # send filename from prompt to clipboard
 # matches e.g.  host:path\n ls file
-text matches ([~/]\S+).*\n.*\s(\S+)\s*$
+patternid prompt:multiline-file
+text matches ([~/]\S+).*?(\S+)\s*$
 add dir=$1 file=$2
 arg isdir $1
 start "echo -n '$dir/$file' | xclip -i"
