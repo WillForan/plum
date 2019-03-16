@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -eux
+[ $# -lt 2 ] && echo "$0 patternid text" && exit 1
+# plum_debug_section line:ag "readme.md:30"
+# plum_debug_section line:ag -primary "readme.md" -clip "notused" -argv dragon 
+
+export PLUM_DEBUG=99
+export PLUM_ECHO=1 
+export PLUM_DEBUGID="$1"; shift
+
+while [ $# -gt 0 ]; do
+   case "$1" in 
+    -argv) 
+       shift
+       plum "$1"
+       exit
+       ;;
+    -clip)
+       shift
+       echo "$1" | xclip -i -selection clipboard
+       shift
+       ;;
+    -primary)
+       shift
+       echo "$1" | xclip -i
+       shift
+       ;;
+    *)
+       echo "$@" | xclip -i
+       break
+       ;;
+   esac
+done
+
+# try it
+plum 
