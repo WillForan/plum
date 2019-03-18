@@ -35,7 +35,8 @@ start vimit "$file" +$line
 3. play with `~/.conf/plum.conf` (see [#Config](#config))
 4. setup hotkey/launcher (see [#Launchers](#launchers)) 
 
-If you are too trusting of internet code and haven't done anything special in your shell rc file, try `source <(curl 'https://raw.githubusercontent.com/WillForan/plum/master/plum/user_install.sh?raw=True')`. But don't do that. Maybe just use it as a guide.
+If you are too trusting of internet code and haven't done anything special in your shell rc file, try `source <(curl 'https://raw.githubusercontent.com/WillForan/plum/master/user_install.sh`). But don't do that. Maybe just use [`user_install.sh`](user_install.sh) as a guide.
+
 
 ### Config
 The config file has two sections. Sections and rulesets must be separated by one newline.See [plum.conf](plum.conf).
@@ -59,6 +60,7 @@ That is, the urxvt title `user@host:/path/to/cwd` is the cwd `/path/to/cwd`
 
 #### Rulesets
 The second section are sets of rules for matching text, extracting variables, and executing commands
+* `patternid` - what to call this pattern rule. Used in debuging. see [`plum_debug_section`](plum_debug_section).
 * `from` - from where to pull the `text` variable 
 * `matches` - match $var against a $regex
 * `add` - add variables from match to namespace
