@@ -363,6 +363,13 @@ from primary
 arg isfile $text
 start dragon $file
 
+# pipe xclip to xargs to another command
+# if e.g. "x|xmessage"
+patternid argv:pipe-xargs
+from argv
+text matches ^x\|(.*)
+start "xclip -o |xargs -r0 $1"
+
 # pipe xclip to another command
 # if e.g. "|xargs xmessage"
 patternid argv:pipe-end
