@@ -205,8 +205,12 @@ sub setup_info() {
    debug("wpid: $wpid",1);
 
    # grab last entry from ps, take only the first word
-   chomp(my $psapp = (split(/\n/, `ps -o comm,args -p $wpid`))[-1]);
-	$textInfo->{app}=(split(/\s+/, $psapp))[0];
+   if($wpid) {
+      chomp(my $psapp = (split(/\n/, `ps -o comm,args -p $wpid`))[-1]);
+      $textInfo->{app}=(split(/\s+/, $psapp))[0];
+   } else {
+      $textInfo->{app}="NOAPP";
+   }
    debug("app: $textInfo->{app}",1);
 
    # use xdotool to get window
