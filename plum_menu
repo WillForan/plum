@@ -17,6 +17,7 @@ rofi_menu_cmd(){
 cat <<EOF | rofi_menu_cmd
 
 search
+cwd
 x|dragon
 x|xmessage
 |xargs -0r xmessage

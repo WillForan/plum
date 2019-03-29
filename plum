@@ -355,6 +355,19 @@ text matches ^notify$
 from primary
 start xmessage "$title: $text"
 
+patternid pwd:file
+from argv
+text matches ^pwd$
+from primary
+text matches (\S+)$
+arg isfile $1
+start "echo -n '$file' | xclip -i"
+
+patternid pwd
+from argv
+text matches ^pwd$
+start "echo -n '$cwd' | xclip -i"
+
 # use dragon drag-n-drop on selected file
 patternid argv:dragon
 from argv
