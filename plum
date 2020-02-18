@@ -297,14 +297,17 @@ unless(caller){
    my $textInfo = setup_info();
    my $fh;
    use File::Basename;
-   my @conf_locs = ("$ENV{HOME}/.config/plum.conf",
-      "/etc/plum.conf",
-      dirname(__FILE__)."/plum.conf");
-   foreach my $f (@conf_locs) {
+   my @conf_dir = ("$ENV{HOME}/.config",
+      "/etc",
+      dirname(__FILE__));
+
+   foreach my $d (@conf_dir) {
+      my $f=$d."/plum.conf";
       debug("testing $f",3);
       next unless -e $f;
       open($fh, '<', $f) or die "cannot open $f";
       debug("using $f",1);
+      last;
    }
    if(not $fh){
       # die "cannot find config file!";
@@ -333,176 +336,12 @@ unless(caller){
 }
 
 __DATA__
-######
-#
-# create config like:
-#  sed -n '/__DATA__/,$p' plum|sed 1d > plum.conf
-#
-######
-## setup how to find cwd from different titles
-# extract from urxvt title
-#   user@host:/path/to/cwd
-# or tmux title
-#   tmux:0:zsh - "user@host: ~/src/thing" 
-parse cwd urxvt|term \w+@\S+?:\s?([~/]\S*?)"?(\s|$) $1
-
-# show what's selected based on arguments
-# maybe use like it were an acme title window
-# echo '^ca(1,plum notify)notify^ca()' | dzen2 -p 
-patternid argv:notify
-from argv
-text matches ^notify$
-from primary
-start xmessage "$title: $text"
-
-patternid pwd:file
-from argv
-text matches ^pwd$
-from primary
-text matches (\S+)$
-arg isfile $1
-start "echo -n '$file' | xclip -i"
-
-patternid pwd
-from argv
-text matches ^pwd$
-start "echo -n '$cwd' | xclip -i"
-
-# use dragon drag-n-drop on selected file
-patternid argv:dragon
-from argv
-text matches ^dragon$
-from primary
-arg isfile $text
-start dragon $file
-
-# pipe xclip to xargs to another command
-# if e.g. "x|xmessage"
-patternid argv:pipe-xargs
-from argv
-text matches ^x\|(.*)
-start "xclip -o |xargs -r0 $1"
-
-# pipe xclip to another command
-# if e.g. "|xargs xmessage"
-patternid argv:pipe-end
-from argv
-text matches ^\|
-start "xclip -o $text"
-
-# pipe secondary xclip to another command
-# if e.g. "c|xargs xmessage"
-patternid argv:clip-redirect
-from argv
-text matches ^c(\|.*)
-start "xclip -selection clipboard -o $1"
-
-# replace selection with output from other command using current selection
-# if e.g. "<perl -pe 's/^\t|^\d{4}//'"  -- unindent
-#
-patternid argv:prim-redirect
-from argv
-text matches ^<(.*)$
-start "xclip -o | $1 | xclip -i"
-
-# replace selection with output from other command
-# if e.g. "ssh s pbpaste>"  -- unindent
-patternid argv:prim-overwrite
-from argv
-text matches ^(.*)>$
-start " $1 | xclip -i"
-
-# replace clipboard with output from other command
-# if e.g. "ssh s pbpaste >c"  -- unindent
-patternid argv:clip-overwrite
-from argv
-text matches ^(.*)>c$
-start " $1 | xclip -i -selection clipboard"
-
-# overwrite clipboard text with piped command output
-# "c<sed 's/^    //'" -> unindent
-patternid argv:clip-redirect
-from argv
-text matches ^c<(.*)$
-#start "xclip -o -selection clipboard | $1 | xargs -r -i -0 xdotool type '{}'"
-start "xclip -o -selection clipboard | $1 | xclip -i -selection clipboard"
-
-# search the web
-patternid argv:search
-from argv # text is already argv from above, but doesn't hurt here:
-text matches ^search$
-from primary
-start xdg-open "https://www.google.com/search?q=$text"
-
-## what to run with what matches
-# open web links
-# N.B. 'from primary' is necessary to reset query after 'from argv'
-patternid web
-from primary 
-text matches (https?://[^\s()]+)
-start xdg-open "$1"
-
-# notmuch email thread
-patternid notmuch:thread
-text matches (thread:[a-z0-9]{16})
-start emacsclient -c -eval "(progn (notmuch-search \"$1\") (flyspell-mode 1) (notmuch-tree-from-search-current-query) (sleep-for 0 200) (notmuch-tree-show-message-in))"
-
-
-# file.pl line 20, near "blah blah"
-patternid error:perl-near
-text matches (\S+) line (\d+), near "(.*)"
-add file=$1 line=$2 search=$3
-arg isfile $file
-start vimit "$file" +$line "$search"
-
-# "file.py", line 20
-patternid error:python
-text matches "(\S+)", line (\d+)
-add file=$1 line=$2
-arg isfile $file
-start vimit "$file" +$line
-
-# file.pl line 20
-patternid error:perl-lineonly
-text matches (\S+) line (\d+)
-add file=$1 line=$2
-arg isfile $file
-start vimit "$file" +$line
-
-# file:line:col like from ag
-patternid line:ag:col
-text matches (\S+)?:(\d+):(\d+)
-add file=$1 line=$2 col=$3
-arg isfile $file
-start vimit "$file" +$line
-
-# file:line like from ag
-patternid line:ag
-text matches (\S+)?:(\d+)
-add file=$1 line=$2
-arg isfile $file
-start vimit "$file" +$line
-
-patternid stock
-text matches ^(20\d{2}-\d{2}-\d{2} ?(\d{2}:\d{2})?).*\s([A-Z]{4})(\s|$)
-add date=$1 ticker=$2
-start xdg-open "https://elite.finviz.com/quote.ashx?t=$1,$2,$3,&ty=c&ta=2&p=i1"
-
-# tmux copy paste
-patternid tmux:smallwindow
-text matches \s?│·+
-start "xclip -o | sed 's/│·\+//g'| xclip -i"
-
-# least specific file match
+# see plum.conf
+# this only hit if none of
+#   {~/.config,/etc,$(dirname $0)}/plum.conf 
+# EXAMPLE
+# least specific file match.  runs acme (editor) on file
 patternid file
 text matches (\S+)
 arg isfile $1
-start vimit "$file"
-
-# send filename from prompt to clipboard
-# matches e.g.  host:path\n ls file
-patternid prompt:multiline-file
-text matches ([~/]\S+).*?(\S+)\s*$
-add dir=$1 file=$2
-arg isdir $1
-start "echo -n '$dir/$file' | xclip -i"
+start acme "$file"
