@@ -1,5 +1,5 @@
 # Plum
-Do something with selected text using a regular expression based and context aware command runner. 
+Execute an acction with selected text using a regular expression based and context aware command runner. 
 
 `plum` is an adulterate plan9 [`plumber(4)`](https://9fans.github.io/plan9port/man/man4/plumber.html) for X11, with other apologies to [godothecorrectthing](https://github.com/andrewchambers/godothecorrectthing).
 
@@ -7,7 +7,13 @@ Do something with selected text using a regular expression based and context awa
 
 Configuration is similar to but not compatible with [`plumb(7)`](https://9fans.github.io/plan9port/man/man7/plumb.html).
 
-## Example rules
+## Supplements
+ * `plum_menu` rofi based selector for `plum argv` pattern actions.
+ * `e` - emacsclient wrapper
+ * `vimit` - vim wrapper. switch to term with vim@file or open new terminal with vim@file. support linenum and search
+ * `plum_acmebar`(tcl/tk) and `plum_pybar` (py/tk) attempts at a always-on-top editable command bar a la acme (via plum argv patterns)
+
+## Example plum config/rules
 
 A simple rule looks like
 ```
@@ -39,10 +45,12 @@ If you are too trusting of internet code and haven't done anything special in yo
 
 
 ### Config
-The config file has two sections. Sections and rulesets must be separated by one newline.See [plum.conf](plum.conf).
+The configuration has settings and rulesets. They must be separated by a single newline. See [plum.conf](plum.conf).
 
 #### Parse CWD
-how to get the $cwd from a $title of a $program. If present, must be at the top of the config file. 
+Currently, the only setting is to how to get `$cwd` from a `$title` of a `$program`.
+
+If desired, the command must be at the top of the config file. 
 
 the Format is 
 ```
@@ -54,21 +62,26 @@ for example
 parse cwd urxvt|term \w+@\S+?:\s?([~/]\S*?)"?(\s|$) $1
 ```
 
-says if the focus window's `ps` listed binary matches `urxvt` or `term`, and the tile looks like `\w+@\S+?:\s?([~/]\S*?)"?(\s|$)`, set the cwd to what is in the first set of parenthesis. 
+says if the focus window's `ps` listed binary matches `urxvt` or `term`, and the tile looks like `\w+@\S+?:\s?([~/]\S*?)"?(\s|$)`, set the cwd to what is in the first captured match. 
 
 That is, the urxvt title `user@host:/path/to/cwd` is the cwd `/path/to/cwd`
 
 #### Rulesets
-The second section are sets of rules for matching text, extracting variables, and executing commands
+After settings, plum searches rulesets. They are sets of rules for matching text, extracting variables, and executing commands
 * `patternid` - what to call this pattern rule. Used in debuging. see [`plum_debug_section`](plum_debug_section).
 * `from` - from where to pull the `text` variable 
-* `matches` - match $var against a $regex
-* `add` - add variables from match to namespace
+* `var matches regexp` - match `$var` against a `$regex`. vars include `text`, `app`, and sometimes `cwd`, `file`, and `dir`.
+* `add` - add variables that can be used by `match`
 * `arg` - test argument (currently only `isfile` and `isdir`), create/overwrite `file` or `dir` variable
 * `start` - run a command
-* `!` varients `!isfile`,`!isdir`, `!matches`
+* `!` provides negation variants `!isfile`,`!isdir`, `!matches`
 
 Though not strictly true, the functional minimum for a rule set is `matches` + `start`
+
+```
+text matches (\w+)
+start xmessage -center $1
+```
 
 #### Config Details
 
@@ -112,6 +125,12 @@ set title
 autocmd BufEnter * let &titlestring = $USER . "@".hostname() . ":" . expand("%:p:h") .' ' . expand("%F")  . ' [vim]'
 ```
 
+in `~/.emacs`
+```
+(setq-default frame-title-format (concat (system-name) "@" (user-login-name) ":%f [emacs %m]"))
+(setq-default icon-title-format frame-title-format)
+```
+
 ### Launchers
 
 `plum` isn't all that useful if you don't have a way to summon it after selecting some text. I have a few suggestions. Consider
@@ -150,8 +169,8 @@ see `vimit`
  - is sketchy for suspended vim
  - netbeans socket interface not yet explored yet
 
-#### emacs
-`emacsclient` would be much easier. Plus tramp provides easy access to remote files. But one crazy term buffer or notmuch query will lock up all buffers. Independent processes are a feature.
+#### Emacs
+`emacsclient` would be much easier. Plus tramp provides easy access to remote files. But one crazy term buffer or notmuch query will lock up all buffers. Independent processes are a feature many `vim` instances.
 
 ## Hacking
 ### Notes
