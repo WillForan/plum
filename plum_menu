@@ -17,10 +17,14 @@ rofi_menu_cmd(){
 cat <<EOF | rofi_menu_cmd
 
 search
-cwd
-x|dragon
+pwd
+upmc_mfa>
+tabfs-info url>
+x|dragon-drag-and-drop
 x|xmessage
+x|afni
 |xargs -0r xmessage
+xclip -o -selection clipboard>
 <tr '[a-z]' '[A-Z]'
 ssh s pbpaste>
 EOF
