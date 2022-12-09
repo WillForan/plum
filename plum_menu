@@ -10,21 +10,26 @@ dzen_menu_cmd(){
 }
 
 rofi_menu_cmd(){
-   rofi -dmenu -m -3 -yoffset -35 -xoffset -10 | # -me-select-entry '' -me-accept-entry 'Mouse1'
+   rofi -dmenu -m -3 -yoffset -35 -xoffset -10 -no-disable-history --cache "$(dirname $0)" | # -me-select-entry '' -me-accept-entry 'Mouse1'
+      tr '\n' ' '|
       xargs -0ri sh -c "plum '{}'"
 }
 
-cat <<EOF | rofi_menu_cmd
-
+# upmc_mfa> # 20221209 - long since failing. MS auth app only
+cat <<'EOF' | rofi_menu_cmd
 search
 pwd
-upmc_mfa>
+commits>
+<tr A-Za-z N-ZA-Mn-za-m `#rot13`
+<tr a-z A-Z `#upcap`
 tabfs-info url>
 x|dragon-drag-and-drop
 x|xmessage
 x|afni
-|xargs -0r xmessage
-xclip -o -selection clipboard>
 <tr '[a-z]' '[A-Z]'
-ssh s pbpaste>
+|xargs -0r xmessage
+x|xmessage `#xargs example`
+xclip -o -selection clipboard>
+|xclip -i -sel clip
+ssh s pbpaste> `#macOS clip`
 EOF
