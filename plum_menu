@@ -11,7 +11,7 @@ dzen_menu_cmd(){
 
 rofi_menu_cmd(){
    rofi -dmenu -m -3 -yoffset -35 -xoffset -10 -no-disable-history --cache "$(dirname $0)" | # -me-select-entry '' -me-accept-entry 'Mouse1'
-      tr '\n' ' '|
+      tr -d '\n'|
       xargs -0ri sh -c "plum '{}'"
 }
 
