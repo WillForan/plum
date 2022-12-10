@@ -69,8 +69,8 @@ That is, the urxvt title `user@host:/path/to/cwd` is the cwd `/path/to/cwd`
 #### Rulesets
 After settings, plum searches rulesets. They are sets of rules for matching text, extracting variables, and executing commands
 * `patternid` - what to call this pattern rule. Used in debuging. see [`plum_debug_section`](plum_debug_section).
-* `from` - from where to pull the `text` variable 
-* `var matches regexp` - match `$var` against a `$regex`. vars include `text`, `app`, and sometimes `cwd`, `file`, and `dir`.
+* `from` - from where to pull the `text` variable. sources are: `primary`, `clipboard`, `argv`, `stdin`
+* `var matches regexp` - match `$var` against a `$regex`. vars include `text`,`title`, `app`, and sometimes `cwd`, `file`, and `dir`.
 * `add` - add variables that can be used by `match`
 * `arg` - test argument (currently only `isfile` and `isdir`), create/overwrite `file` or `dir` variable
 * `start` - run a command
