@@ -14,10 +14,11 @@ rofi_menu_cmd(){
       xargs -0ri sh -c "plum '{}'"
 }
 
-cat <<EOF | rofi_menu_cmd
+cat <<'EOF' | rofi_menu_cmd
 
 search
 pwd
+slack-browse-imgs s2tmux
 upmc_mfa>
 tabfs-info url>
 x|dragon-drag-and-drop
@@ -26,5 +27,6 @@ x|afni
 |xargs -0r xmessage
 xclip -o -selection clipboard>
 <tr '[a-z]' '[A-Z]'
+<workwiki-date
 ssh s pbpaste>
 EOF
