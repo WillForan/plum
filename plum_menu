@@ -22,6 +22,8 @@ pwd
 <workwiki-date
 slack-browse-imgs s2tmux
 commits>
+w3m
+emacs-w3m
 <tr A-Za-z N-ZA-Mn-za-m `#rot13`
 <tr a-z A-Z `#upcap`
 tabfs-info url>
